@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bond Price vs Yield Visualizer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #334155;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            max-width: 42rem;
+            width: 90%;
+            border: 1px solid #e2e8f0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 0.5rem 0;
+        }
+        .header p {
+            color: #64748b;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin: 0;
+        }
+        
+        /* Visualization Area */
+        .vis-area {
+            position: relative;
+            width: 100%;
+            height: 16rem;
+            background: #ffffff;
+            border-radius: 0.75rem;
+            border: 1px solid #f1f5f9;
+            overflow: hidden;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .grid-bg {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 1rem;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+        .grid-cell { border: 1px solid #cbd5e1; border-radius: 4px; }
+        
+        /* Seesaw Plank */
+        .seesaw-plank {
+            position: relative;
+            width: 80%;
+            height: 1rem;
+            background-color: #334155;
+            border-radius: 9999px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1rem;
+            z-index: 10;
+        }
+        
+        /* Weights (Boxes) */
+        .weight-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform: translateY(-4rem); 
+        }
+        .info-box {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            min-width: 7rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: white;
+            border: 2px solid #e2e8f0;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        .info-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .info-value {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+        .visual-weight {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Fulcrum */
+        .fulcrum {
+            position: absolute;
+            bottom: 2.5rem;
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 40px solid #1e293b;
+            z-index: 5;
+        }
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 2.5rem;
+            background-color: #e2e8f0;
+        }
+
+        /* Controls */
+        .controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        .slider-container { margin-bottom: 1.5rem; }
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        .slider-label { font-size: 0.875rem; font-weight: 600; color: #334155; }
+        .slider-value { font-size: 0.875rem; font-weight: 700; color: #2563eb; }
+        
+        input[type=range] {
+            width: 100%;
+            height: 0.5rem;
+            background: #e2e8f0;
+            border-radius: 0.25rem;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 1.25rem;
+            height: 1.25rem;
+            background: #2563eb;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background .15s ease-in-out;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { background: #1d4ed8; }
+
+        .slider-legend {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 0.25rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .dash-card {
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            border: 1px solid #f1f5f9;
+            background: #f8fafc;
+        }
+        .dash-label { font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem; }
+        .dash-value { font-weight: 600; color: #1e293b; font-size: 0.9rem; display: flex; align-items: center;}
+        .dash-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem; }
+
+        .explainer {
+            display: flex;
+            align-items: flex-start;
+            padding: 0.75rem;
+            background-color: #eff6ff;
+            color: #1e40af;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        .icon { width: 1.25rem; height: 1.25rem; margin-right: 0.5rem; flex-shrink: 0; }
+        
+        /* Utility Colors */
+        .text-green { color: #15803d; }
+        .text-red { color: #b91c1c; }
+        .text-blue { color: #1d4ed8; }
+        
+        .bg-green-light { background-color: #dcfce7; border-color: #22c55e; }
+        .bg-red-light { background-color: #fee2e2; border-color: #ef4444; }
+        .bg-blue-light { background-color: #dbeafe; border-color: #3b82f6; }
+        
+        .bg-blue-solid { background-color: #2563eb; }
+        .bg-orange-solid { background-color: #f97316; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>The Bond Seesaw</h2>
+        <p>Move the slider to change Market Interest Rates (Yield).<br>Watch what happens to the Bond Price.</p>
+    </div>
+
+    <!-- Visualization -->
+    <div class="vis-area">
+        <div class="grid-bg">
+            <!-- Grid generated by JS -->
+        </div>
+        
+        <div class="seesaw-plank" id="plank">
+            <!-- Left: Price -->
+            <div class="weight-container" style="transform: translateY(-4rem) translateX(-1rem);">
+                <div id="price-box" class="info-box bg-blue-light">
+                    <div class="info-label">Bond Price</div>
+                    <div class="info-value" id="price-val">$1000</div>
+                </div>
+                <div class="visual-weight bg-blue-solid">Bond</div>
+            </div>
+
+            <!-- Right: Yield -->
+            <div class="weight-container" style="transform: translateY(-4rem) translateX(1rem);">
+                <div id="yield-box" class="info-box bg-blue-light">
+                    <div class="info-label">Market Yield</div>
+                    <div class="info-value" id="yield-val">5.0%</div>
+                </div>
+                <div class="visual-weight bg-orange-solid">Rates</div>
+            </div>
+        </div>
+
+        <div class="fulcrum"></div>
+        <div class="ground"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <div class="slider-container">
+            <div class="slider-header">
+                <label class="slider-label">Market Interest Rate (Yield)</label>
+                <span class="slider-value" id="slider-display">5.0%</span>
+            </div>
+            <input type="range" id="yield-slider" min="1" max="10" step="0.1" value="5.0">
+            <div class="slider-legend">
+                <span>1% (Low)</span>
+                <span>5% (Coupon)</span>
+                <span>10% (High)</span>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="dash-card">
+                <div class="dash-label">Your Fixed Coupon</div>
+                <div class="dash-value">5.0%</div>
+                <div class="dash-sub">Pays $50/year (Fixed)</div>
+            </div>
+            <div id="status-card" class="dash-card">
+                <div class="dash-label">Bond Status</div>
+                <div class="dash-value" id="status-text">
+                    Par Bond
+                </div>
+            </div>
+        </div>
+
+        <div class="explainer">
+            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p id="explainer-text">
+                Perfect Balance. The market rate equals your coupon rate.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Constants
+    const FACE_VALUE = 1000;
+    const COUPON_RATE = 5.0;
+    const YEARS = 10;
+
+    // Elements
+    const slider = document.getElementById('yield-slider');
+    const sliderDisplay = document.getElementById('slider-display');
+    const plank = document.getElementById('plank');
+    const priceVal = document.getElementById('price-val');
+    const yieldVal = document.getElementById('yield-val');
+    const priceBox = document.getElementById('price-box');
+    const yieldBox = document.getElementById('yield-box');
+    const statusCard = document.getElementById('status-card');
+    const statusText = document.getElementById('status-text');
+    const explainerText = document.getElementById('explainer-text');
+    const gridBg = document.querySelector('.grid-bg');
+
+    // Init Grid
+    for(let i=0; i<24; i++) {
+        const div = document.createElement('div');
+        div.className = 'grid-cell';
+        gridBg.appendChild(div);
+    }
+
+    // Main Update Function
+    function update() {
+        const marketYield = parseFloat(slider.value);
+        sliderDisplay.textContent = marketYield.toFixed(1) + '%';
+        yieldVal.textContent = marketYield.toFixed(1) + '%';
+
+        // 1. Calculate Price
+        const r = marketYield / 100;
+        const c = FACE_VALUE * (COUPON_RATE / 100);
+        const n = YEARS;
+
+        let price;
+        if (r === 0) {
+            price = FACE_VALUE + (c * n);
+        } else {
+            // PV Formula
+            const pvCoupons = c * ((1 - Math.pow(1 + r, -n)) / r);
+            const pvFace = FACE_VALUE / Math.pow(1 + r, n);
+            price = pvCoupons + pvFace;
+        }
+        
+        priceVal.textContent = '$' + price.toFixed(0);
+
+        // 2. Determine Relationship & Styles
+        let relationship = 'Par';
+        
+        // Reset Styles
+        priceBox.className = 'info-box';
+        yieldBox.className = 'info-box';
+        statusCard.className = 'dash-card';
+        statusText.className = 'dash-value';
+
+        if (marketYield > COUPON_RATE) {
+            relationship = 'Discount';
+            // Price is LOW (Red), Yield is HIGH (Green/Blue)
+            priceBox.classList.add('bg-red-light');
+            yieldBox.classList.add('bg-green-light');
+            statusCard.classList.add('bg-red-light');
+            statusText.classList.add('text-red');
+            statusText.innerHTML = `📉 Discount Bond`;
+            
+            explainerText.innerHTML = `<strong>Why is Price Low?</strong> The market pays <strong>${marketYield}%</strong>, but your bond only pays <strong>5%</strong>. Nobody wants your bond unless you give them a <strong>discount</strong>.`;
+        
+        } else if (marketYield < COUPON_RATE) {
+            relationship = 'Premium';
+            // Price is HIGH (Green), Yield is LOW (Red/Blue)
+            priceBox.classList.add('bg-green-light');
+            yieldBox.classList.add('bg-red-light');
+            statusCard.classList.add('bg-green-light');
+            statusText.classList.add('text-green');
+            statusText.innerHTML = `📈 Premium Bond`;
+
+            explainerText.innerHTML = `<strong>Why is Price High?</strong> The market only pays <strong>${marketYield}%</strong>, but your bond pays a massive <strong>5%</strong>. Everyone wants it, so you can sell it at a <strong>premium</strong>.`;
+        } else {
+            // Par
+            priceBox.classList.add('bg-blue-light');
+            yieldBox.classList.add('bg-blue-light');
+            statusText.classList.add('text-blue');
+            statusText.innerHTML = `⚖️ Par Bond`;
+
+            explainerText.innerHTML = `<strong>Perfect Balance.</strong> The market rate equals your coupon rate. The bond trades exactly at its Face Value ($1000).`;
+        }
+
+        // 3. Animate Seesaw (Tilt)
+        const tiltAngle = (marketYield - COUPON_RATE) * 3;
+        plank.style.transform = `rotate(${tiltAngle}deg)`;
+    }
+
+    // Listeners
+    slider.addEventListener('input', update);
+
+    // Init
+    update();
+
+</script>
+
+</body>
+</html>
